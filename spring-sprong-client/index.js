@@ -1,13 +1,16 @@
 
-var broker = 'amqp://192.168.99.100:' + process.argv[2];
+var broker = 'amqp://' + process.argv[2];
 
 console.log("Connecting to " + broker);
 
 var open = require('amqplib').connect(broker);
 var recvCount = 0, sendCount = 0, recvTotal = 0, sendTotal = 0;
+var chanCount= 0;
+var chanMax = 8;
 
 function channel(conn) {
   var ok = conn.createChannel();
+  var chanNum = chanCount++;
   ok = ok.then(function(ch) {
     ch.consume('amq.rabbitmq.reply-to', function(msg) {
       if (msg !== null) {
@@ -17,7 +20,7 @@ function channel(conn) {
     return ch;
   }).then(function(ch) {
     setInterval(function() {
-    	ch.publish('spring-sprong-requests', '', new Buffer('{}'), {'replyTo': 'amq.rabbitmq.reply-to'});
+    	ch.publish('spring-sprong-requests', 'chan'+chanNum, new Buffer('{}'), {'replyTo': 'amq.rabbitmq.reply-to'});
 	sendCount++;
     }, 1);
   });
@@ -27,7 +30,7 @@ function channel(conn) {
 // Consumer
 open.then(function(conn) {
  
-  for (var i=0; i < 4; i++)
+  for (var i=0; i < chanMax; i++)
     channel(conn);
  
   setInterval(function() {
