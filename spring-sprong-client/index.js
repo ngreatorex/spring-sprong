@@ -1,5 +1,12 @@
+var crypto = require('crypto');
 
-var broker = 'amqp://' + process.argv[2];
+function randomValueHex (len) {
+    return crypto.randomBytes(Math.ceil(len/2))
+        .toString('hex') // convert to hexadecimal format
+        .slice(0,len);   // return required number of characters
+}
+
+var broker = 'amqp://broker:5672'; // + process.argv[2];
 
 console.log("Connecting to " + broker);
 
@@ -10,7 +17,8 @@ var chanMax = 8;
 
 function channel(conn) {
   var ok = conn.createChannel();
-  var chanNum = chanCount++;
+  var clientId = randomValueHex(16);
+
   ok = ok.then(function(ch) {
     ch.consume('amq.rabbitmq.reply-to', function(msg) {
       if (msg !== null) {
@@ -20,7 +28,7 @@ function channel(conn) {
     return ch;
   }).then(function(ch) {
     setInterval(function() {
-    	ch.publish('spring-sprong-requests', 'chan'+chanNum, new Buffer('{}'), {'replyTo': 'amq.rabbitmq.reply-to'});
+    	ch.publish('spring-sprong-requests', clientId, new Buffer('{}'), {'replyTo': 'amq.rabbitmq.reply-to'});
 	sendCount++;
     }, 1);
   });
