@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:int-amqp="http://www.springframework.org/schema/integration/amqp"
+	xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+	xsi:schemaLocation="http://www.springframework.org/schema/integration/amqp http://www.springframework.org/schema/integration/amqp/spring-integration-amqp-4.1.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit-1.4.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration-4.1.xsd">
+
+
+	<rabbit:connection-factory id="rabbitConnectionFactory"
+		host="${rabbitmq.hostname}" />
+	
+	<rabbit:queue id="requestQueue1" auto-delete="true" durable="false" />
+	<rabbit:queue id="requestQueue2" auto-delete="true" durable="false" />
+	
+	<bean id="requestHashExchangeTest" class="org.springframework.amqp.core.CustomExchange">
+        <constructor-arg name="name" value="spring-sprong-requests"/>
+        <constructor-arg name="type" value="x-consistent-hash"/>
+        <constructor-arg name="durable" value="true"/>
+        <constructor-arg name="autoDelete" value="false"/>
+    </bean>
+
+    <bean name="requestBinding1"  class="org.springframework.amqp.rabbit.config.BindingFactoryBean">
+        <property name="exchange" value="spring-sprong-requests" />
+        <property name="destinationQueue" ref="requestQueue1" />
+        <property name="shouldDeclare" value="true" />
+        <property name="routingKey" value="10" />
+    </bean>
+    
+    <bean name="requestBinding2"  class="org.springframework.amqp.rabbit.config.BindingFactoryBean">
+        <property name="exchange" value="spring-sprong-requests" />
+        <property name="destinationQueue" ref="requestQueue2" />
+        <property name="shouldDeclare" value="true" />
+        <property name="routingKey" value="10" />
+    </bean>
+	
+	<int:channel id="requestChannel" />
+	<int:channel id="replyChannel" />
+	<int:channel id="requestObjectChannel" />
+	<int:channel id="replyObjectChannel" />
+
+	<int-amqp:inbound-gateway id="inboundGateway"
+		request-channel="requestChannel" reply-channel="replyChannel"
+		queue-names="#{@requestQueue1.name},#{@requestQueue2.name}" reply-timeout="5000" 
+		concurrent-consumers="4" acknowledge-mode="NONE"
+		mapped-request-headers="*" mapped-reply-headers="*"  />
+
+	<int:json-to-object-transformer id="requestTransformer"
+		type="demo.model.Request" input-channel="requestChannel" 
+		output-channel="requestObjectChannel" />
+	<int:object-to-json-transformer id="replyTransformer"
+		input-channel="replyObjectChannel" output-channel="replyChannel" />
+
+	<int:service-activator id="requestServiceActivator"
+		requires-reply="true" 
+		input-channel="requestObjectChannel"
+		output-channel="replyObjectChannel">
+		<bean class="demo.RequestController" />
+	</int:service-activator>
+
+
+</beans>

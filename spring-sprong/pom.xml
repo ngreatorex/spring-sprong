@@ -46,6 +46,16 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.integration</groupId>
+			<artifactId>spring-integration-amqp</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.integration</groupId>
+			<artifactId>spring-integration-java-dsl</artifactId>
+			<version>1.0.2.RELEASE</version>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -55,41 +65,94 @@
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
 			<plugin>
-				<artifactId>maven-resources-plugin</artifactId>
-				<version>2.7</version>
-				<executions>
-					<execution>
-						<id>prepare-dockerfile</id>
-						<phase>validate</phase>
-						<goals>
-							<goal>copy-resources</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.build.directory}/docker-file</outputDirectory>
-							<resources>
-								<resource>
-									<directory>src/main/docker</directory>
-									<filtering>true</filtering>
-								</resource>
-							</resources>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>com.spotify</groupId>
+				<groupId>org.jolokia</groupId>
 				<artifactId>docker-maven-plugin</artifactId>
-				<version>0.2.11</version>
+				<version>0.13.2</version>
+
 				<configuration>
-					<imageName>spring-sprong</imageName>
-					<dockerDirectory>${project.build.directory}/docker-file</dockerDirectory>
-					<resources>
-						<resource>
-							<targetPath>/</targetPath>
-							<directory>${project.build.directory}</directory>
-							<include>${project.build.finalName}.jar</include>
-						</resource>
-					</resources>
+					<images>
+						<image>
+							<alias>broker</alias>
+							<name>${project.artifactId}-rabbitmq</name>
+							<build>
+								<from>rabbitmq:management</from>
+								<runCmds>
+									<run>rabbitmq-plugins enable rabbitmq_consistent_hash_exchange</run>
+								</runCmds>
+								<assembly>
+									<descriptorRef>artifact</descriptorRef>
+								</assembly>
+							</build>
+							<run>
+								<ports>
+									<port>rabbitmq.port:5672</port>
+									<port>rabbitmq.management-port:15672</port>
+								</ports>
+								<log>
+									<prefix>MQ</prefix>
+									<date>DEFAULT</date>
+									<color>YELLOW</color>
+								</log>
+								<wait>
+									<log>Server startup complete</log>
+									<time>20000</time>
+								</wait>
+							</run>
+						</image>
+						<image>
+							<alias>server</alias>
+							<name>${project.artifactId}-server</name>
+							<build>
+								<from>java:8</from>
+								<tags>
+									<tag>latest</tag>
+									<tag>${project.version}</tag>
+								</tags>
+								<ports>
+									<port>8080</port>
+								</ports>
+								<volumes>
+									<volume>/tmp</volume>
+								</volumes>
+
+								<entryPoint>
+									<exec>
+										<arg>/run.sh</arg>
+									</exec>
+								</entryPoint>
+								<cmd>
+									<exec>
+										<arg>java</arg>
+										<arg>-Djava.security.egd=file:/dev/./urandom</arg>
+										<arg>-jar</arg>
+										<arg>/code/${project.build.finalName}.jar</arg>
+									</exec>
+								</cmd>
+
+								<assembly>
+									<basedir>/</basedir>
+									<descriptor>assembly.xml</descriptor>
+								</assembly>
+							</build>
+							<run>
+								<links>
+									<link>broker:broker</link>
+								</links>
+								<log>
+									<prefix>APP</prefix>
+									<date>DEFAULT</date>
+									<color>BLUE</color>
+								</log>
+								<ports>
+									<port>tomcat.port:8080</port>
+								</ports>
+								<wait>
+									<url>http://${docker.host.address}:${tomcat.port}/</url>
+									<time>60000</time>
+								</wait>
+							</run>
+						</image>
+					</images>
 				</configuration>
 			</plugin>
 		</plugins>
