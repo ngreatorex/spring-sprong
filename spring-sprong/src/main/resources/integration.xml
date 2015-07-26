@@ -12,10 +12,8 @@
 	<rabbit:connection-factory id="rabbitConnectionFactory"
 		host="${rabbitmq.hostname}" />
 	
-	<rabbit:queue id="requestQueue1" auto-delete="true" durable="false" />
-	<rabbit:queue id="requestQueue2" auto-delete="true" durable="false" />
-	<rabbit:queue id="requestQueue3" auto-delete="true" durable="false" />
-	<rabbit:queue id="requestQueue4" auto-delete="true" durable="false" />
+	<rabbit:queue id="requestQueue1" name="spring-sprong-rq1" auto-delete="true" durable="false" exclusive="false" />
+	<rabbit:queue id="requestQueue2" name="spring-sprong-rq2" auto-delete="true" durable="false" exclusive="false" />
 	
 	<bean id="requestHashExchangeTest" class="org.springframework.amqp.core.CustomExchange">
         <constructor-arg name="name" value="spring-sprong-requests"/>
@@ -37,20 +35,6 @@
         <property name="shouldDeclare" value="true" />
         <property name="routingKey" value="10" />
     </bean>
-    
-    <bean name="requestBinding3"  class="org.springframework.amqp.rabbit.config.BindingFactoryBean">
-        <property name="exchange" value="spring-sprong-requests" />
-        <property name="destinationQueue" ref="requestQueue3" />
-        <property name="shouldDeclare" value="true" />
-        <property name="routingKey" value="10" />
-    </bean>
-    
-    <bean name="requestBinding4"  class="org.springframework.amqp.rabbit.config.BindingFactoryBean">
-        <property name="exchange" value="spring-sprong-requests" />
-        <property name="destinationQueue" ref="requestQueue4" />
-        <property name="shouldDeclare" value="true" />
-        <property name="routingKey" value="10" />
-    </bean>
 	
 	<int:channel id="requestChannel" />
 	<int:channel id="replyChannel" />
@@ -59,8 +43,8 @@
 
 	<int-amqp:inbound-gateway id="inboundGateway"
 		request-channel="requestChannel" reply-channel="replyChannel"
-		queue-names="#{@requestQueue1.name},#{@requestQueue2.name},#{@requestQueue3.name},#{@requestQueue4.name}" reply-timeout="5000" 
-		concurrent-consumers="16" acknowledge-mode="NONE"
+		queue-names="#{@requestQueue1.name},#{@requestQueue2.name}" reply-timeout="5000" 
+		concurrent-consumers="8" acknowledge-mode="NONE"
 		mapped-request-headers="*" mapped-reply-headers="*"  />
 
 	<int:json-to-object-transformer id="requestTransformer"
